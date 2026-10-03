@@ -1,6 +1,5 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
-from datetime import datetime
 
 class StationTemperature(BaseModel):
     station_id: str = Field(..., description="測站編號")
@@ -21,6 +20,13 @@ class StationTemperature(BaseModel):
     wind_direction_deg: Optional[float] = Field(None, description="風向 (度)")
     precipitation_mm: Optional[float] = Field(None, description="累積降雨量 (mm)")
     weather: Optional[str] = Field(None, description="天氣描述")
+
+    # 生活氣象與外出指南新增欄位
+    uv_index: Optional[float] = Field(None, description="紫外線指數 (UVI)")
+    uv_level: Optional[str] = Field(None, description="紫外線等級 (低量/中量/高量/過量/危險)")
+    comfort_text: Optional[str] = Field(None, description="體感舒適度描述")
+    dressing_advice: Optional[str] = Field(None, description="建議穿著搭配")
+    essentials: Optional[List[str]] = Field(None, description="外出必備推薦小物清單")
 
 class LatestTemperatureResponse(BaseModel):
     source: str = "CWA"

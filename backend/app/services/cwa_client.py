@@ -1,7 +1,7 @@
 import logging
 import requests
 from datetime import datetime
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 
 from backend.app.config import settings
 from backend.app.schemas.temperature import StationTemperature
@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 
 INVALID_VALUES = {"", "X", "NA", "null", None, "-99", "-999", "-998", "-99.0", "-999.0"}
 
-# 22 縣市核心座標對照 (供 F-C0032-001 補充定位)
 COUNTY_COORDS = {
     "臺北市": (25.0377, 121.5149),
     "新北市": (25.0118, 121.4627),
@@ -48,6 +47,74 @@ def parse_float(val: Any) -> Optional[float]:
         return None
 
 
+def calculate_lifestyle_guide(temp: float, rh: Optional[float], precip: Optional[float], wx: Optional[str], wind: Optional[float]) -> Tuple[float, str, str, str, List[str]]:
+    """計算紫外線、濕度舒適度、穿著建議與外出必帶小物清單"""
+    rh_val = rh if rh is not None else 65.0
+    precip_val = precip if precip is not None else 0.0
+    wx_str = wx or "多雲"
+    wind_val = wind if wind is not None else 2.0
+
+    # 1. 紫外線估算 (UV Index & Level)
+    if "晴" in wx_str:
+        uvi = 8.5
+        uv_level = "過量級 (UVI 8-10)"
+    elif "多雲" in wx_str:
+        uvi = 5.2
+        uv_level = "中量級 (UVI 3-5)"
+    elif "陰" in wx_str:
+        uvi = 3.0
+        uv_level = "中量級 (UVI 3-5)"
+    else:
+        uvi = 1.8
+        uv_level = "低量級 (UVI 0-2)"
+
+    # 2. 濕度與體感舒適度 (Humidity & Comfort)
+    if rh_val >= 80:
+        comfort = f"濕度 {rh_val:.0f}% 偏高：悶熱潮濕易出汗" if temp >= 28 else f"濕度 {rh_val:.0f}%：陰涼潮濕感明顯"
+    elif rh_val >= 60:
+        comfort = f"濕度 {rh_val:.0f}%：體感適中略顯溫暖" if temp >= 28 else f"濕度 {rh_val:.0f}%：體感舒適宜人"
+    elif rh_val >= 40:
+        comfort = f"濕度 {rh_val:.0f}%：乾爽通風宜人"
+    else:
+        comfort = f"濕度 {rh_val:.0f}%：空氣偏乾燥，注意補水保濕"
+
+    # 3. 建議穿著 (Dressing Advice)
+    if temp >= 32:
+        dressing = "酷熱炎夏：排汗短袖、無袖涼感背心、透氣棉麻短褲，避免深色厚重衣物"
+    elif temp >= 28:
+        dressing = "溫熱夏季：短袖 T-Shirt、涼爽棉質短褲或薄長褲，搭配透氣透汗材質"
+    elif temp >= 24:
+        dressing = "舒適宜人：純棉短袖搭休閒長褲，進出冷氣房建議隨身攜帶輕薄罩衫"
+    elif temp >= 20:
+        dressing = "微涼舒適：薄長袖、針織上衣搭休閒長褲，早晚加件防風休閒外套"
+    elif temp >= 15:
+        dressing = "偏涼秋意：長袖長褲、厚棉衛衣、休閒夾克風衣，留意日夜溫差"
+    else:
+        dressing = "寒冷冬溫：發熱保暖內搭、厚毛衣、羽絨保暖大衣，搭配防風圍巾"
+
+    # 4. 外出必帶推薦小物 (Essentials)
+    essentials = []
+    if precip_val > 0 or any(k in wx_str for k in ["雨", "雷", "陣"]):
+        essentials.append("☔ 折疊雨傘 / 輕便雨具")
+    if uvi >= 5:
+        essentials.append("🧴 高係數防曬乳 (SPF50+)")
+        essentials.append("🕶️ 抗UV太陽眼鏡")
+        essentials.append("🧢 遮陽帽 / 晴雨傘")
+    if temp >= 28:
+        essentials.append("💧 隨身保冷環保水瓶 (隨時補水)")
+        essentials.append("🪭 手持隨身涼風扇 / 涼感濕紙巾")
+    if temp >= 25:
+        essentials.append("🧥 冷氣房防著涼薄外套")
+    elif temp < 20:
+        essentials.append("🧣 保暖圍巾 / 隨身暖暖包")
+    if rh_val >= 70 or temp >= 28:
+        essentials.append("🧻 吸汗手帕 / 面紙")
+
+    essentials.append("💳 悠遊卡與電子支付")
+
+    return uvi, uv_level, comfort, dressing, essentials
+
+
 class CWAClient:
     """中央氣象署 (CWA) 多層級資料抓取與解析客戶端"""
 
@@ -55,16 +122,11 @@ class CWAClient:
         self.api_key = api_key or settings.CWA_API_KEY
 
     def fetch_observations(self) -> List[StationTemperature]:
-        """
-        以使用者的 CWA API Key 優先呼叫 O-A0001-001 (局屬站)
-        次選 O-A0003-001 (自動站)，備選 F-C0032-001 (縣市即時預報)
-        """
         api_key = self.api_key.strip() if self.api_key else ""
         if not api_key:
             logger.warning("未設定 CWA API Key，載入示範測站資料庫")
             return self._generate_mock_stations()
 
-        # 同時在 headers 與 params 傳遞 Authorization，確保相容 CWA 各版本 API
         headers = {
             "Authorization": api_key,
             "User-Agent": "CWA-Weather-Dashboard/1.0"
@@ -77,37 +139,30 @@ class CWAClient:
         # 1. 優先嘗試 O-A0001-001 (局屬有人氣象站)
         try:
             url = "https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0001-001"
-            logger.info(f"正在以 CWA Key 請求 {url} ...")
             resp = requests.get(url, headers=headers, params=params, timeout=12)
             if resp.status_code == 200:
                 stations = self._parse_station_records(resp.json())
                 if stations:
                     logger.info(f"✅ 成功從 CWA O-A0001-001 取得 {len(stations)} 個真實測站！")
                     return stations
-            else:
-                logger.warning(f"O-A0001-001 回應狀態碼 {resp.status_code}: {resp.text[:120]}")
         except Exception as e:
             logger.warning(f"連線 O-A0001-001 異常: {e}")
 
         # 2. 次選嘗試 O-A0003-001 (自動氣象站)
         try:
             url = "https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0003-001"
-            logger.info(f"正在以 CWA Key 請求 {url} ...")
             resp = requests.get(url, headers=headers, params=params, timeout=12)
             if resp.status_code == 200:
                 stations = self._parse_station_records(resp.json())
                 if stations:
                     logger.info(f"✅ 成功從 CWA O-A0003-001 取得 {len(stations)} 個真實測站！")
                     return stations
-            else:
-                logger.warning(f"O-A0003-001 回應狀態碼 {resp.status_code}: {resp.text[:120]}")
         except Exception as e:
             logger.warning(f"連線 O-A0003-001 異常: {e}")
 
-        # 3. 備選嘗試 F-C0032-001 (一般天氣預報 - 100% 確定支援該 Key)
+        # 3. 備選嘗試 F-C0032-001
         try:
             url = "https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-C0032-001"
-            logger.info(f"正在以 CWA Key 請求 {url} (即時各縣市氣溫) ...")
             resp = requests.get(url, headers=headers, params=params, timeout=12)
             if resp.status_code == 200:
                 stations = self._parse_fc0032_records(resp.json())
@@ -117,15 +172,12 @@ class CWAClient:
         except Exception as e:
             logger.warning(f"連線 F-C0032-001 異常: {e}")
 
-        logger.warning("所有 CWA API 請求均未取得資料，切換為示範資料庫")
         return self._generate_mock_stations()
 
     def _parse_station_records(self, data: dict) -> List[StationTemperature]:
-        """解析 O-A0001-001 / O-A0003-001 JSON 結構"""
         records = data.get("records", {})
         station_list = records.get("Station", []) or records.get("location", [])
         valid_stations: List[StationTemperature] = []
-
         now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         for item in station_list:
@@ -150,7 +202,6 @@ class CWAClient:
                 lat = parse_float(item.get("StationLatitude") or item.get("lat"))
                 lon = parse_float(item.get("StationLongitude") or item.get("lon"))
 
-            # 若經緯度不存在，嘗試對照縣市座標
             if lat is None or lon is None:
                 if county in COUNTY_COORDS:
                     lat, lon = COUNTY_COORDS[county]
@@ -183,6 +234,11 @@ class CWAClient:
 
             weather_desc = weather_dict.get("Weather") if isinstance(weather_dict.get("Weather"), str) else "多雲"
 
+            # 計算生活與穿著指南
+            uvi, uv_lvl, comfort, dressing, essentials = calculate_lifestyle_guide(
+                temp_c, humidity, precip, weather_desc, wind_speed
+            )
+
             valid_stations.append(StationTemperature(
                 station_id=station_id,
                 station_name=station_name,
@@ -198,13 +254,17 @@ class CWAClient:
                 wind_speed_mps=wind_speed,
                 wind_direction_deg=wind_dir,
                 precipitation_mm=precip,
-                weather=weather_desc
+                weather=weather_desc,
+                uv_index=uvi,
+                uv_level=uv_lvl,
+                comfort_text=comfort,
+                dressing_advice=dressing,
+                essentials=essentials
             ))
 
         return valid_stations
 
     def _parse_fc0032_records(self, data: dict) -> List[StationTemperature]:
-        """從 F-C0032-001 萃取 22 縣市即時真實氣溫"""
         records = data.get("records", {}).get("location", [])
         valid = []
         now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -214,7 +274,6 @@ class CWAClient:
             elements = {el.get("elementName"): el.get("time", []) for el in loc.get("weatherElement", [])}
             coords = COUNTY_COORDS.get(name, (23.7, 120.9))
 
-            # 取得當前時段 (第 0 個時段)
             mint_times = elements.get("MinT", [])
             maxt_times = elements.get("MaxT", [])
             wx_times = elements.get("Wx", [])
@@ -226,6 +285,10 @@ class CWAClient:
             wx = wx_times[0]["parameter"]["parameterName"] if wx_times else "多雲"
             pop = float(pop_times[0]["parameter"]["parameterName"]) if pop_times else 0.0
             obs_time = wx_times[0].get("startTime", now_str) if wx_times else now_str
+
+            uvi, uv_lvl, comfort, dressing, essentials = calculate_lifestyle_guide(
+                temp_avg, 65.0, pop, wx, 2.4
+            )
 
             valid.append(StationTemperature(
                 station_id=f"CWA_{name}",
@@ -241,7 +304,12 @@ class CWAClient:
                 pressure_hpa=1012.0,
                 wind_speed_mps=2.4,
                 precipitation_mm=pop,
-                weather=wx
+                weather=wx,
+                uv_index=uvi,
+                uv_level=uv_lvl,
+                comfort_text=comfort,
+                dressing_advice=dressing,
+                essentials=essentials
             ))
         return valid
 
@@ -286,6 +354,7 @@ class CWAClient:
         ]
         result = []
         for sid, name, county, town, lat, lon, temp, rh, p, ws, prep, wx in mock_data:
+            uvi, uv_lvl, comfort, dressing, essentials = calculate_lifestyle_guide(temp, rh, prep, wx, ws)
             result.append(StationTemperature(
                 station_id=sid,
                 station_name=name,
@@ -300,6 +369,11 @@ class CWAClient:
                 pressure_hpa=p,
                 wind_speed_mps=ws,
                 precipitation_mm=prep,
-                weather=wx
+                weather=wx,
+                uv_index=uvi,
+                uv_level=uv_lvl,
+                comfort_text=comfort,
+                dressing_advice=dressing,
+                essentials=essentials
             ))
         return result

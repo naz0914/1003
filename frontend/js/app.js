@@ -134,6 +134,12 @@ function renderCwaMarkers() {
       L.DomEvent.stopPropagation(e);
     });
 
+    // 紫外線等級樣式
+    let uvClass = "uv-low";
+    if (st.uv_index >= 8) uvClass = "uv-danger";
+    else if (st.uv_index >= 6) uvClass = "uv-high";
+    else if (st.uv_index >= 3) uvClass = "uv-mid";
+
     // 彈出視窗 Popup
     const popupHtml = `
       <div class="cwa-popup-card">
@@ -154,13 +160,31 @@ function renderCwaMarkers() {
           <div>雨量：<b>${st.precipitation_mm !== null ? st.precipitation_mm + ' mm' : '0.0 mm'}</b></div>
           <div>海拔：<b>${st.altitude_m !== null ? Math.round(st.altitude_m) + ' m' : '-'}</b></div>
         </div>
+
+        <!-- 生活氣象與穿搭小物指南 -->
+        <div class="lifestyle-section">
+          <div class="lifestyle-header">
+            <span class="lifestyle-title">☀️ 紫外線與舒適度</span>
+            <span class="uv-badge ${uvClass}">${st.uv_level || '中量級'}</span>
+          </div>
+          <div style="font-size:11px; color:#cbd5e1;">💧 ${st.comfort_text || '體感舒適'}</div>
+
+          <div style="font-size:11px; font-weight:700; color:#facc15; margin-top:2px;">👕 建議穿著：</div>
+          <div class="dressing-box">${st.dressing_advice || '舒適透氣衣物'}</div>
+
+          <div class="essentials-title">🎒 出門必帶推薦小物：</div>
+          <div class="essentials-tags">
+            ${(st.essentials || ['☔ 晴雨傘', '🧴 防曬乳', '💧 隨身水瓶']).map(item => `<span class="essential-tag">${item}</span>`).join('')}
+          </div>
+        </div>
+
         <div style="font-size:11px; color:#64748b; margin-top:8px; border-top:1px solid rgba(255,255,255,0.1); padding-top:4px;">
           觀測時間：${st.observed_at.replace("T", " ")}
         </div>
       </div>
     `;
 
-    marker.bindPopup(popupHtml, { maxWidth: 300, minWidth: 220 });
+    marker.bindPopup(popupHtml, { maxWidth: 320, minWidth: 260 });
     marker.addTo(cwaLayerGroup);
   });
 }
@@ -216,7 +240,9 @@ function playVoiceBroadcast() {
   const coldest = sorted[sorted.length - 1];
   const avg = (stationsData.reduce((acc, s) => acc + s.temperature_c, 0) / stationsData.length).toFixed(1);
 
-  const text = `中央氣象署即時天氣播報。全台觀測測站共 ${stationsData.length} 處。目前全台最高溫出現在 ${hottest.county || ''}${hottest.station_name}，氣溫高達 ${hottest.temperature_c.toFixed(1)} 度，天氣為 ${hottest.weather || '晴朗'}。全台最低溫出現在 ${coldest.station_name}，為 ${coldest.temperature_c.toFixed(1)} 度。全台平均氣溫約為 ${avg} 度。提醒您外出注意防曬並多補充水分。`;
+  const uviInfo = hottest.uv_level ? `今日紫外線強度為${hottest.uv_level}。` : '';
+  const dressingInfo = hottest.dressing_advice ? `穿搭建議：${hottest.dressing_advice}。` : '';
+  const text = `中央氣象署即時天氣與生活穿搭播報。目前全台最高溫出現在 ${hottest.county || ''}${hottest.station_name}，氣溫高達 ${hottest.temperature_c.toFixed(1)} 度，天氣為 ${hottest.weather || '晴朗'}。全台最低溫出現在 ${coldest.station_name}，為 ${coldest.temperature_c.toFixed(1)} 度。全台平均氣溫約為 ${avg} 度。${uviInfo}${dressingInfo}提醒您外出請攜帶防曬用品與隨身水瓶，午後有降雨機率，建議隨身攜帶雨具！`;
 
   window.speechSynthesis.cancel(); // 停止先前的播報
   const utterance = new SpeechSynthesisUtterance(text);

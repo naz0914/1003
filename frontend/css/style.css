@@ -467,3 +467,83 @@ body {
 .popup-grid b {
   color: #f1f5f9;
 }
+
+/* 生活氣象與穿搭指南樣式 */
+.lifestyle-section {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lifestyle-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.lifestyle-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #38bdf8;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.uv-badge {
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.uv-low { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); }
+.uv-mid { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); }
+.uv-high { background: rgba(249, 115, 22, 0.2); color: #fb923c; border: 1px solid rgba(249, 115, 22, 0.4); }
+.uv-danger { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); }
+
+.dressing-box {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: #f1f5f9;
+  border-left: 3px solid #06b6d4;
+}
+
+.essentials-title {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.essentials-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.essential-tag {
+  background: rgba(6, 182, 212, 0.12);
+  border: 1px solid rgba(6, 182, 212, 0.25);
+  color: #e2e8f0;
+  font-size: 0.7rem;
+  padding: 3px 8px;
+  border-radius: 9999px;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.essential-tag:hover {
+  background: rgba(6, 182, 212, 0.25);
+  transform: translateY(-1px);
+}
+

@@ -385,6 +385,77 @@ with tab_trend:
 
         st.plotly_chart(fig, use_container_width=True)
 
+        # 🎒 今日生活穿搭與外出指南 (新增生活氣象細項)
+        st.markdown("##### 🎒 今日生活穿搭與外出指南")
+        life_col1, life_col2 = st.columns(2)
+        
+        max_t = city_df['maxT'].max()
+        min_t = city_df['minT'].min()
+        wx = latest_row['weather']
+        pop = city_df['pop'].max()
+
+        # 紫外線評估
+        if "晴" in wx:
+            uvi_val = "8~10 (過量級)"
+            uvi_tip = "紫外線強烈，外出務必做好防曬！"
+            uvi_color = "#ef4444"
+        elif "多雲" in wx:
+            uvi_val = "5~7 (高量級)"
+            uvi_tip = "紫外線適中偏強，建議塗抹防曬乳。"
+            uvi_color = "#f59e0b"
+        else:
+            uvi_val = "2~4 (中低量級)"
+            uvi_tip = "紫外線微弱，出門輕鬆無負擔。"
+            uvi_color = "#10b981"
+
+        # 建議穿著評估
+        if max_t >= 32:
+            outfit = "👕 酷熱炎夏：排汗短袖、涼感無袖背心、透氣棉麻短褲，避免深色厚重衣物。"
+        elif max_t >= 28:
+            outfit = "👕 溫熱夏季：短袖 T-Shirt、棉質休閒短褲或薄長褲，保持通風涼爽。"
+        elif max_t >= 24:
+            outfit = "👔 舒適宜人：純棉短袖搭休閒長褲，冷氣房內建議隨身備一件輕薄罩衫。"
+        elif max_t >= 20:
+            outfit = "🧥 微涼舒適：薄長袖、針織上衣搭休閒長褲，早晚出門加件防風休閒薄外套。"
+        else:
+            outfit = "🧣 偏涼低溫：長袖長褲、厚棉保暖帽T、夾克風衣，留意日夜溫差。"
+
+        # 出門必備小物清單
+        items = []
+        if pop >= 30 or "雨" in wx:
+            items.append("☔ 折疊雨傘 / 輕便雨具")
+        if "晴" in wx or max_t >= 28:
+            items.append("🧴 高係數防曬乳 (SPF50+)")
+            items.append("🕶️ 抗UV太陽眼鏡")
+            items.append("🧢 遮陽帽 / 晴雨傘")
+        if max_t >= 30:
+            items.append("💧 隨身環保水瓶 (定時補充水分)")
+            items.append("🪭 手持隨身風扇 / 涼感濕紙巾")
+        if max_t - min_t >= 6:
+            items.append("🧥 日夜溫差隨身薄外套")
+        items.append("💳 悠遊卡與電子支付")
+
+        with life_col1:
+            st.markdown(f"""
+            <div style="background: rgba(255,255,255,0.06); padding: 14px 18px; border-radius: 10px; border-left: 4px solid {uvi_color};">
+                <div style="font-size: 0.9rem; font-weight: bold; color: {uvi_color};">☀️ 紫外線指數：{uvi_val}</div>
+                <div style="font-size: 0.85rem; color: #475569; margin-top: 4px;">{uvi_tip}</div>
+                <div style="font-size: 0.9rem; font-weight: bold; color: #0284c7; margin-top: 10px;">💧 濕度與體感：{latest_row['ci']}</div>
+                <div style="font-size: 0.85rem; color: #475569; margin-top: 4px;">{outfit}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with life_col2:
+            st.markdown("""
+            <div style="background: rgba(255,255,255,0.06); padding: 14px 18px; border-radius: 10px; border-left: 4px solid #10b981;">
+                <div style="font-size: 0.9rem; font-weight: bold; color: #059669;">🎒 出門必帶推薦小物清單：</div>
+            </div>
+            """, unsafe_allow_html=True)
+            for it in items:
+                st.markdown(f"- **{it}**")
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
         # 顯示該縣市詳細資料表 (Step 15)
         st.markdown("##### 📋 詳細時段預報表")
         display_city_df = city_df[[
