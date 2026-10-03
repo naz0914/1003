@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# SQLite Database (optional to ignore or keep local)
+*.db-journal
+
+# Environment variables
+.env
+
+# VS Code / IDE
+.vscode/
+.idea/
+.DS_Store
