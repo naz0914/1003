@@ -10,6 +10,15 @@
 
 ---
 
+## 📸 實機畫面展示 (Live Preview)
+
+<div align="center">
+  <img src="screenshot.png" alt="Taiwan Weather Dashboard 實機運行截圖" width="100%" />
+  <p><em>▲ CWA × Windy 台灣即時氣溫播報系統：測站氣溫色階標記、紫外線等級、建議穿著與出門必備小物指南</em></p>
+</div>
+
+---
+
 ## 🌐 網站與專案相關連結 (Important Links)
 
 | 項目名稱 | 連結網址 | 說明 |
