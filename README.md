@@ -1,5 +1,6 @@
 # 🇹🇼 Taiwan Weather Forecast & CWA × Windy 台灣即時氣溫視覺化平台
 
+[![Live Demo](https://img.shields.io/badge/Live%20Website-Streamlit%20Cloud-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://irbwsbs7a8fkzta3ztaxxd.streamlit.app/)
 [![GitHub Repo](https://img.shields.io/badge/GitHub-naz0914%2F1003-blue?logo=github)](https://github.com/naz0914/1003)
 [![Python Version](https://img.shields.io/badge/Python-3.10%2B-green?logo=python)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.109%2B-009688?logo=fastapi)](https://fastapi.tiangolo.com/)
@@ -23,6 +24,7 @@
 
 | 項目名稱 | 連結網址 | 說明 |
 | :--- | :--- | :--- |
+| 🚀 **線上正式公開網站 (Live Website)** | [https://irbwsbs7a8fkzta3ztaxxd.streamlit.app/](https://irbwsbs7a8fkzta3ztaxxd.streamlit.app/) | 🔥 **免安裝、免開終端機，手機與電腦點開即看！** |
 | 📦 **GitHub 專案倉庫** | [https://github.com/naz0914/1003](https://github.com/naz0914/1003) | 完整開源原始碼與版本控制紀錄 |
 | 🗺️ **CWA × Windy 即時地圖 (本地)** | [http://localhost:8000](http://localhost:8000) | 現代化暗黑地圖、氣象測站標籤、語音播報 |
 | 📖 **FastAPI Swagger API 文件** | [http://localhost:8000/docs](http://localhost:8000/docs) | 互動式 RESTful API 文件與在線測試 |
