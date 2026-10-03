@@ -22,3 +22,7 @@ ENV/
 .vscode/
 .idea/
 .DS_Store
+
+# Raw screenshots (screenshot.png is tracked)
+螢幕擷取畫面*.png
+
