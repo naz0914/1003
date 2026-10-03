@@ -269,6 +269,10 @@ with tab_modern:
             <span class="brand-title">CWA × Windy</span>
           </div>
           <span class="brand-sub">台灣氣象站即時氣溫視覺化</span>
+          <div id="obs-time-tag" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.35); padding: 4px 12px; border-radius: 9999px; font-size: 0.76rem; color: #38bdf8; display: flex; align-items: center; gap: 5px;">
+            <span>🕒 測站觀測時間：</span>
+            <strong id="top-obs-time">載入中...</strong>
+          </div>
         </div>
 
         <div class="header-actions">
@@ -413,6 +417,8 @@ with tab_modern:
             const itemsHtml = (st.essentials || ['☔ 晴雨傘', '🧴 防曬乳', '💧 隨身水瓶'])
               .map(it => `<span class="tag">${{it}}</span>`).join('');
 
+            const obsTimeDisplay = st.observed_at ? st.observed_at.replace('T', ' ').substring(0, 16) : '即時觀測';
+
             const popupHtml = `
               <div class="popup-card">
                 <div class="popup-header">
@@ -420,6 +426,7 @@ with tab_modern:
                   <span style="background:${{color}}; color:white; padding:2px 8px; border-radius:10px; font-weight:bold;">${{st.temperature_c.toFixed(1)}}°C</span>
                 </div>
                 <div style="color:#94a3b8; font-size:11px;">${{st.county || ''}} ${{st.town || ''}} (測站: ${{st.station_id}})</div>
+                <div style="color:#38bdf8; font-size:11px; margin:2px 0 4px 0; font-weight:600;">🕒 測站觀測時間：${{obsTimeDisplay}}</div>
                 <div class="popup-grid">
                   <div>天氣：<b>${{st.weather || '多雲'}}</b></div>
                   <div>濕度：<b>${{st.humidity_percent || 65}}%</b></div>
@@ -436,6 +443,17 @@ with tab_modern:
             marker.bindPopup(popupHtml, {{ maxWidth: 300 }});
             marker.addTo(markersLayer);
           }});
+        }}
+
+        // 更新頂部觀測時間
+        if (stations.length > 0 && stations[0].observed_at) {{
+          const timeStr = stations[0].observed_at.replace('T', ' ').substring(0, 16);
+          const topTimeEl = document.getElementById('top-obs-time');
+          if (topTimeEl) topTimeEl.innerText = timeStr;
+        }} else {{
+          const nowStr = new Date().toLocaleString('zh-TW', {{ hour12: false }}).substring(0, 16);
+          const topTimeEl = document.getElementById('top-obs-time');
+          if (topTimeEl) topTimeEl.innerText = nowStr;
         }}
 
         // 渲染排行榜
@@ -498,8 +516,13 @@ with tab_trend:
 
     city_df = get_forecasts_by_location(selected_city, "data.db")
     if not city_df.empty:
-        c1, c2, c3, c4 = st.columns(4)
         latest_row = city_df.iloc[0]
+        start_t = latest_row['startTime'].replace('T', ' ')
+        end_t = latest_row['endTime'].replace('T', ' ')
+        updated_t = latest_row['updatedAt'] if 'updatedAt' in latest_row else '即時連線'
+        st.info(f"🕒 **當前預報區間時間**：`{start_t}` 至 `{end_t}` ｜ **資料庫記錄時間**：`{updated_t}`")
+
+        c1, c2, c3, c4 = st.columns(4)
         with c1: st.metric("即時預報天氣", f"{latest_row['weather']}")
         with c2: st.metric("預測最高溫", f"{city_df['maxT'].max()} °C")
         with c3: st.metric("預測最低溫", f"{city_df['minT'].min()} °C")
@@ -529,6 +552,7 @@ with tab_folium:
     st.subheader("🗺️ 全台氣溫分布地圖 (標準無浮水印 OpenStreetMap)")
     time_slots = get_available_time_slots("data.db")
     if time_slots:
+        st.caption(f"🕒 **當前地圖顯示預報時段**：`{time_slots[0][0].replace('T', ' ')}` 至 `{time_slots[0][1].replace('T', ' ')}`")
         slot_df = get_forecasts_by_time(time_slots[0][0], "data.db")
         taiwan_map = folium.Map(location=[23.7, 120.9], zoom_start=7.4, tiles="OpenStreetMap")
         for _, row in slot_df.iterrows():
@@ -550,6 +574,7 @@ with tab_folium:
 # =========================================================================
 with tab_data:
     st.subheader("📊 SQLite (data.db) 完整氣象數據表")
+    st.caption("💡 包含全台 22 縣市預報時段起訖時間 (startTime / endTime) 與資料寫入時間戳記 (updatedAt)：")
     all_df = get_all_forecasts("data.db")
     if not all_df.empty:
         st.dataframe(all_df, use_container_width=True, hide_index=True)

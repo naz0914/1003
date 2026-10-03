@@ -152,6 +152,9 @@ function renderCwaMarkers() {
         <div style="color:#94a3b8; font-size:12px; margin-top:2px;">
           ${st.county || ''} ${st.town || ''} (測站: ${st.station_id})
         </div>
+        <div style="color:#38bdf8; font-size:11px; margin:3px 0 6px 0; font-weight:600;">
+          🕒 觀測時間：${st.observed_at ? st.observed_at.replace('T', ' ').substring(0, 16) : '即時觀測'}
+        </div>
         <div class="popup-grid">
           <div>天氣：<b>${st.weather || '多雲'}</b></div>
           <div>濕度：<b>${st.humidity_percent !== null ? st.humidity_percent + '%' : '-'}</b></div>
