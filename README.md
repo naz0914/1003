@@ -6,7 +6,7 @@
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.30%2B-FF4B4B?logo=streamlit)](https://streamlit.io/)
 [![CWA Open Data](https://img.shields.io/badge/CWA-Open%20Data-orange)](https://opendata.cwa.gov.tw/)
 
-> 本專案結合**中央氣象署 (CWA) 開放資料**、**SQLite 結構化存儲**、**Windy Map Forecast API** 與 **Leaflet 1.4.x 高解析度地圖**，打造具備即時資料串接、7 階氣溫色階、Top 10 排行榜、高山海拔篩選與瀏覽器語音播報的現代化全方位氣象平台。
+> 本專案結合**中央氣象署 (CWA) 開放資料**、**SQLite 結構化存儲**、**Windy Map Forecast API** 與 **Leaflet 高解析度地圖**，打造具備即時資料串接、7 階氣溫色階、Top 10 排行榜、高山海拔篩選與瀏覽器語音播報的現代化全方位氣象平台。
 
 ---
 
@@ -23,34 +23,45 @@
 
 ---
 
-## 📌 系統雙模式架構與技術棧 (Architecture)
+## 📌 系統架構流程圖 (System Architecture)
 
-本專案提供**兩種運行模式**，滿足不同使用場景：
+### 模式一：24 步微課程標準資料管線流程圖 (Streamlit + SQLite)
 
 ```mermaid
-flowchart TD
-    subgraph Data Sources
-        CWA[中央氣象署 CWA API<br/>O-A0001-001 / O-A0003-001 / F-C0032-001]
-    end
-
-    subgraph Mode 1: 現代化地圖與語音播報 (FastAPI + Leaflet + Windy)
-        CWA -->|HTTP Fetch / 快取 TTL| API[FastAPI 後端 - localhost:8000]
-        API -->|JSON / GeoJSON| Web[Glassmorphism 前端網頁]
-        Web -->|底圖切換| M1[Esri Dark / OSM 高畫質暗黑地圖]
-        Web -->|API Key 切換| M2[Windy 動態風場粒子層]
-        Web --> M3[🎙️ 瀏覽器中文語音播報]
-        Web --> M4[🔥 Top 10 全台最高溫排行榜]
-    end
-
-    subgraph Mode 2: 24 步微課程標準儀表板 (Streamlit + SQLite + Folium)
-        CWA -->|Requests| ETL[cwa_api.py 資料清洗]
-        ETL -->|Pandas DataFrame| DB[(SQLite: data.db)]
-        DB -->|SQL 查詢| ST[Streamlit App - localhost:8501]
-        ST --> S1[🗺️ Folium 台灣氣溫地圖]
-        ST --> S2[📈 Plotly 高低溫走勢圖]
-        ST --> S3[📊 SQLite 資料庫檢視與 CSV 匯出]
-    end
+graph TD
+    A["中央氣象署 CWA Open Data API (F-C0032-001)"] -->|"HTTP Requests / JSON"| B["cwa_api.py (資料獲取與解析)"]
+    B -->|"Pandas DataFrame 資料清洗"| C[("SQLite 資料庫 (data.db)")]
+    C -->|"SQL 查詢 / 讀取"| D["app.py (Streamlit 儀表板應用)"]
+    D --> E["🗺️ Folium 台灣氣溫互動地圖"]
+    D --> F["📈 Plotly 高低溫走勢圖"]
+    D --> G["📋 全台縣市詳細氣象數據表"]
 ```
+
+---
+
+### 模式二：CWA × Windy 現代化即時地圖與語音播報架構 (FastAPI + Leaflet)
+
+```mermaid
+graph TD
+    CWA["中央氣象署 CWA API (O-A0001-001 / O-A0003-001)"] -->|"HTTP Fetch / 快取 TTL"| BE["FastAPI 後端服務 (localhost:8000)"]
+    BE -->|"JSON 正規化 / GeoJSON"| FE["Glassmorphism 前端網頁"]
+    FE --> W1["🗺️ Esri Dark / OSM 高畫質暗黑地圖"]
+    FE --> W2["💨 Windy 動態風場粒子層"]
+    FE --> W3["🎙️ 瀏覽器即時中文語音播報"]
+    FE --> W4["🔥 Top 10 全台最高溫排行榜"]
+```
+
+---
+
+## 🗺️ 24 步開發藍圖實現對照 (Curriculum Mapping)
+
+| 階段 | 步驟 | 核心任務 | 對應實作檔案 / 模組 |
+| :--- | :--- | :--- | :--- |
+| **Phase 1: 資料獲取與解析** | Steps 1~6 | CWA API 串接、取得 JSON、提取縣市與 MinT/MaxT | `cwa_api.py` (`fetch_cwa_weather`, `parse_weather_json`) |
+| **Phase 2: 資料處理與存儲** | Steps 7~10 | Pandas DataFrame 清洗、設計 SQLite Table、SQL 存取 | `database.py` (`init_db`, `save_forecasts`, `get_all_forecasts`) |
+| **Phase 3: 儀表板介面開發** | Steps 11~16 | Streamlit 基礎建構、縣市選單、氣溫折線圖、版面整合 | `app.py` (Tab 2: 氣溫趨勢分析與時段預報表) |
+| **Phase 4: 進階視覺化與優化** | Steps 17~20 | Folium 台灣地圖、溫度色階標記、時段切換器、效能快取 | `app.py` (Tab 1: 台灣氣象地圖與指標卡片) |
+| **Phase 5: 版本控制與上線** | Steps 21~24 | Git 提交、推送 GitHub 倉庫、架構回顧與延伸應用 | Git Commit & Push / 專案文檔與教學說明 |
 
 ---
 
@@ -69,7 +80,7 @@ pip install -r requirements.txt
 
 ---
 
-### 2. 啟動模式一：【CWA × Windy 現代化即時地圖與語音播報版】（推薦！）
+### 2. 啟動模式一：【CWA × Windy 現代化即時地圖與語音播報版】
 
 ```powershell
 .venv\Scripts\python.exe run.py
@@ -82,7 +93,7 @@ pip install -r requirements.txt
 
 ---
 
-### 3. 啟動模式二：【Streamlit 台灣氣象預報儀表板版】（課程精華版）
+### 3. 啟動模式二：【Streamlit 台灣氣象預報儀表板版】
 
 ```powershell
 .venv\Scripts\python.exe -m streamlit run app.py
