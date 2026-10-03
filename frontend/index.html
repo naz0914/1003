@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CWA × Windy 台灣即時氣溫播報視覺化</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🇹🇼</text></svg>">
+  
+  <!-- Google Fonts: Inter & Noto Sans TC -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+  
+  <!-- Leaflet 1.4.0 CSS (嚴格相容 Windy Map Forecast API) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.4.0/dist/leaflet.css" />
+  
+  <!-- 自訂超現代暗色玻璃擬態樣式 -->
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+  <!-- 全螢幕地圖容器 -->
+  <div id="windy"></div>
+
+  <!-- 頂部浮動導航列 (Glassmorphic Header) -->
+  <header class="glass-panel top-navbar">
+    <div class="brand">
+      <div class="brand-badge">
+        <span class="pulse-dot"></span>
+        <span class="brand-title">CWA × Windy</span>
+      </div>
+      <span class="brand-sub">台灣氣象站即時氣溫視覺化</span>
+    </div>
+
+    <div class="header-status">
+      <div class="status-item" id="cwa-status-box">
+        <span class="status-label">CWA 觀測時戳</span>
+        <span class="status-value" id="cwa-obs-time">載入中...</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">測站總數</span>
+        <span class="status-value" id="cwa-station-count">-- 站</span>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <!-- 語音播報按鈕 -->
+      <button class="btn btn-glass" id="btn-voice-broadcast" title="語音播報全台最新天氣與最熱地區">
+        <span class="btn-icon">🎙️</span>
+        <span class="btn-text">語音播報</span>
+      </button>
+
+      <!-- 手動同步更新按鈕 -->
+      <button class="btn btn-primary" id="btn-refresh" title="立即從 CWA API 獲取最新資料">
+        <span class="btn-icon" id="refresh-spinner">🔄</span>
+        <span class="btn-text">即時同步</span>
+        <span class="countdown-badge" id="countdown-timer">5:00</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- 右側控制面板 (Floating Layer & Filter Controls) -->
+  <aside class="glass-panel control-panel" id="control-panel">
+    <div class="panel-header">
+      <h3>🎛️ 圖層與篩選控制</h3>
+      <button class="btn-icon-only" id="btn-toggle-panel" title="收合/展開面板">◀</button>
+    </div>
+
+    <div class="panel-section">
+      <label class="section-title">底圖引擎 (Map Engine)</label>
+      <div class="btn-group-toggle">
+        <button class="toggle-btn active" id="btn-engine-windy">Windy 動態風場</button>
+        <button class="toggle-btn" id="btn-engine-leaflet">高畫質 Leaflet</button>
+      </div>
+      <div id="windy-key-hint" class="hint-text">
+        <span>💡 支援 Windy 動態風場與 Leaflet 高畫質地圖自由切換</span>
+      </div>
+    </div>
+
+    <div class="panel-section" id="leaflet-styles-group">
+      <label class="section-title">地圖圖資風格 (Map Style)</label>
+      <select id="select-basemap" class="custom-select">
+        <option value="esri_dark">🌌 科技深灰 (Esri Dark - 乾淨無浮水印)</option>
+        <option value="osm_streets">🗺️ 標準道路 (OpenStreetMap)</option>
+        <option value="esri_imagery">🛰️ 衛星遙測 (Esri Satellite)</option>
+      </select>
+    </div>
+
+    <div class="panel-section" id="windy-layers-group">
+      <label class="section-title">Windy 背景氣象層</label>
+      <div class="layer-grid">
+        <button class="layer-btn active" data-overlay="wind">💨 風速粒子</button>
+        <button class="layer-btn" data-overlay="temp">🌡️ 氣溫模型</button>
+        <button class="layer-btn" data-overlay="rain">🌧️ 降雨預報</button>
+        <button class="layer-btn" data-overlay="clouds">☁️ 雲層分佈</button>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <label class="section-title">CWA 觀測數據疊加</label>
+      <label class="switch-row">
+        <span>顯示測站溫度標記</span>
+        <input type="checkbox" id="toggle-markers" checked>
+      </label>
+      <label class="switch-row">
+        <span>顯示溫度數值標籤</span>
+        <input type="checkbox" id="toggle-labels" checked>
+      </label>
+      <label class="switch-row highlight-row">
+        <span>⛰️ 排除高山測站 (&gt;1000m)</span>
+        <input type="checkbox" id="toggle-exclude-mountain">
+      </label>
+    </div>
+
+    <div class="panel-section">
+      <label class="section-title">縣市區域快速篩選</label>
+      <select id="select-county" class="custom-select">
+        <option value="全部">全部縣市 (全台灣)</option>
+        <option value="臺北市">臺北市</option>
+        <option value="新北市">新北市</option>
+        <option value="基隆市">基隆市</option>
+        <option value="桃園市">桃園市</option>
+        <option value="新竹市">新竹市</option>
+        <option value="新竹縣">新竹縣</option>
+        <option value="苗栗縣">苗栗縣</option>
+        <option value="臺中市">臺中市</option>
+        <option value="彰化縣">彰化縣</option>
+        <option value="南投縣">南投縣</option>
+        <option value="雲林縣">雲林縣</option>
+        <option value="嘉義市">嘉義市</option>
+        <option value="嘉義縣">嘉義縣</option>
+        <option value="臺南市">臺南市</option>
+        <option value="高雄市">高雄市</option>
+        <option value="屏東縣">屏東縣</option>
+        <option value="宜蘭縣">宜蘭縣</option>
+        <option value="花蓮縣">花蓮縣</option>
+        <option value="臺東縣">臺東縣</option>
+        <option value="澎湖縣">澎湖縣</option>
+        <option value="金門縣">金門縣</option>
+        <option value="連江縣">連江縣</option>
+      </select>
+    </div>
+  </aside>
+
+  <!-- 左下角前 10 大最高溫排行榜 (Top 10 Hottest Drawer) -->
+  <div class="glass-panel leaderboard-panel" id="leaderboard-panel">
+    <div class="leaderboard-header" id="leaderboard-header">
+      <span class="fire-icon">🔥</span>
+      <span class="leaderboard-title">全台 Top 10 最高溫測站</span>
+      <span class="toggle-arrow">▲</span>
+    </div>
+    <div class="leaderboard-body" id="leaderboard-list">
+      <!-- 動態載入測站排行 -->
+      <div class="loading-placeholder">載入排行榜中...</div>
+    </div>
+  </div>
+
+  <!-- 右下角現代化氣溫色階圖例 (Color Scale Legend) -->
+  <div class="glass-panel legend-panel">
+    <div class="legend-title">氣溫色階 (°C)</div>
+    <div class="gradient-bar"></div>
+    <div class="legend-labels">
+      <span>&lt;10° 寒</span>
+      <span>15° 涼</span>
+      <span>20° 溫</span>
+      <span>25° 舒</span>
+      <span>30° 熱</span>
+      <span>&gt;35° 酷熱</span>
+    </div>
+  </div>
+
+  <!-- 測站詳細資訊側欄抽屜 (Station Detail Drawer) -->
+  <div class="station-drawer" id="station-drawer">
+    <button class="drawer-close" id="drawer-close">✕</button>
+    <div class="drawer-content" id="drawer-content">
+      <!-- 動態渲染詳細卡片 -->
+    </div>
+  </div>
+
+  <!-- Leaflet 1.4.0 JS -->
+  <script src="https://unpkg.com/leaflet@1.4.0/dist/leaflet.js"></script>
+  
+  <!-- Windy Map Forecast API libBoot.js (選用) -->
+  <script src="https://api.windy.com/assets/map-forecast/libBoot.js"></script>
+
+  <!-- 前端核心模組腳本 -->
+  <script src="/static/js/colorScale.js"></script>
+  <script src="/static/js/cwaApi.js"></script>
+  <script src="/static/js/windyLoader.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
